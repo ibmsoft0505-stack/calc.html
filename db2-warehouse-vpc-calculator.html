@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Db2 Warehouse VPC Calculator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background: #f0f4f8;
+    color: #1f2328;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  .container { max-width: 820px; margin: 0 auto; }
+
+  .header {
+    background: #1c3f6e;
+    color: #fff;
+    border-radius: 10px 10px 0 0;
+    padding: 28px 32px 22px;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header p  { font-size: 13px; opacity: 0.75; margin-top: 4px; }
+
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+    padding: 28px 32px;
+  }
+  .card:last-of-type { border-radius: 0 0 10px 10px; }
+
+  /* Toggle switch */
+  .toggle-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+  }
+  .toggle-bar span { font-size: 13px; font-weight: 600; color: #57606a; }
+  .toggle-bar span.active { color: #1c3f6e; }
+  .toggle-wrap { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #d1d5db; border-radius: 24px; transition: .2s;
+  }
+  .toggle-slider:before {
+    content: ""; position: absolute;
+    width: 18px; height: 18px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s;
+  }
+  .toggle-wrap input:checked + .toggle-slider { background: #1c3f6e; }
+  .toggle-wrap input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+  /* Hardware panel */
+  .hw-panel {
+    display: none;
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin-bottom: 24px;
+  }
+  .hw-panel.visible { display: block; }
+
+  .hw-fit-tag {
+    display: inline-block;
+    font-size: 12px; font-weight: 700;
+    padding: 3px 12px; border-radius: 20px;
+    margin-top: 6px;
+  }
+  .hw-fit-tag.ok    { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+  .hw-fit-tag.warn  { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .hw-fit-tag.error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #57606a;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 24px;
+  }
+  @media (max-width: 580px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label { font-size: 12px; font-weight: 600; color: #1f2328; }
+  label .req   { color: #d93025; margin-left: 2px; }
+  label .hint  { font-weight: 400; color: #57606a; margin-left: 4px; }
+
+  input[type=number], select {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: #1f2328;
+    background: #fff;
+    width: 100%;
+    transition: border-color .15s;
+    -webkit-appearance: none;
+  }
+  input[type=number]:focus, select:focus {
+    outline: none;
+    border-color: #3b82d4;
+    box-shadow: 0 0 0 3px rgba(59,130,212,.12);
+  }
+
+  .radio-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 2px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 400; font-size: 13px; cursor: pointer; color: #1f2328;
+  }
+  .radio-group input[type=radio] { accent-color: #3b82d4; width: 15px; height: 15px; }
+
+  .checkbox-grid { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 4px; }
+  .checkbox-grid label {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 400; font-size: 13px; cursor: pointer;
+  }
+  .checkbox-grid input[type=checkbox] { accent-color: #3b82d4; width: 14px; height: 14px; }
+
+  .calc-btn {
+    display: block; width: 100%; margin-top: 24px; padding: 13px;
+    background: #1c3f6e; color: #fff; font-size: 15px; font-weight: 700;
+    border: none; border-radius: 8px; cursor: pointer;
+    letter-spacing: 0.2px; transition: background .15s;
+  }
+  .calc-btn:hover { background: #163257; }
+
+  /* Result panel */
+  .result-panel {
+    display: none; margin-top: 24px; border-radius: 10px;
+    overflow: hidden; border: 1px solid #e5e7eb;
+  }
+  .result-panel.visible { display: block; }
+
+  .result-header {
+    background: #1c3f6e; color: #fff;
+    padding: 16px 24px; font-size: 14px; font-weight: 700; letter-spacing: 0.2px;
+  }
+  .result-body { background: #fff; padding: 24px; }
+
+  /* Summary row: VPC + hardware fit side by side */
+  .summary-row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .summary-box {
+    flex: 1; min-width: 180px;
+    background: #f7f8fa; border: 1px solid #e5e7eb;
+    border-radius: 8px; padding: 18px 20px;
+  }
+  .summary-box .big   { font-size: 44px; font-weight: 800; color: #1c3f6e; line-height: 1; }
+  .summary-box .lbl   { font-size: 12px; font-weight: 600; color: #57606a; margin-top: 4px; }
+  .summary-box .sub   { font-size: 12px; color: #57606a; margin-top: 6px; }
+  .summary-box.fit-ok    { border-color: #a7f3d0; background: #f0fdf8; }
+  .summary-box.fit-warn  { border-color: #fde68a; background: #fffbeb; }
+  .summary-box.fit-error { border-color: #fca5a5; background: #fff5f5; }
+
+  .breakdown { margin-top: 20px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+  .breakdown-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #57606a; margin-bottom: 10px; }
+  .breakdown-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .breakdown-table td { padding: 5px 0; vertical-align: top; }
+  .breakdown-table td:first-child { color: #57606a; width: 65%; }
+  .breakdown-table td:last-child   { font-weight: 600; text-align: right; color: #1f2328; }
+  .breakdown-table tr.hw-row td   { color: #3b82d4; font-style: italic; }
+  .breakdown-table tr.hw-row td:last-child { color: #3b82d4; }
+
+  /* Per-environment accordion */
+  .env-accordion { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  .env-block {
+    border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+  }
+  .env-block-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px; cursor: pointer; user-select: none;
+    background: #f7f8fa; gap: 10px;
+  }
+  .env-block-header:hover { background: #eef1f5; }
+  .env-block-header .env-chk { accent-color: #1c3f6e; width: 15px; height: 15px; flex-shrink: 0; }
+  .env-block-header .env-label {
+    flex: 1; font-size: 13px; font-weight: 700; color: #1f2328;
+  }
+  .env-block-header .env-badge-role {
+    font-size: 11px; font-weight: 600; color: #57606a;
+    background: #e5e7eb; padding: 2px 8px; border-radius: 10px;
+  }
+  .env-block-header .env-arrow {
+    font-size: 11px; color: #57606a; transition: transform .2s;
+  }
+  .env-block-header.open .env-arrow { transform: rotate(90deg); }
+  .env-block-body {
+    display: none; padding: 16px 18px; background: #fff;
+    border-top: 1px solid #e5e7eb;
+  }
+  .env-block-body.visible { display: block; }
+  .env-note { font-size: 11.5px; color: #57606a; margin-bottom: 12px;
+    background: #f0f4f8; border-radius: 4px; padding: 6px 10px; }
+
+  /* Per-environment result table */
+  .env-result-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  .env-result-table th {
+    background: #1c3f6e; color: #fff; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px; padding: 8px 10px; text-align: left;
+  }
+  .env-result-table th:last-child { text-align: right; }
+  .env-result-table td { padding: 7px 10px; border-bottom: 1px solid #f0f2f5; vertical-align: top; }
+  .env-result-table td:last-child { font-weight: 700; text-align: right; color: #1c3f6e; }
+  .env-result-table tr:last-child td { border-bottom: none; }
+  .env-result-table tr.env-total td {
+    background: #f0f4f8; font-weight: 800; border-top: 2px solid #1c3f6e;
+  }
+  .env-result-table tr.env-total td:last-child { color: #1c3f6e; font-size: 15px; }
+  .env-result-table .step-pill {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    background: #e8f0fb; color: #1c3f6e; border-radius: 10px;
+    padding: 1px 7px; margin-right: 4px; vertical-align: middle;
+  }
+  .env-result-table .why-text {
+    display: block; font-size: 11px; color: #57606a; margin-top: 2px; font-weight: 400;
+  }
+
+  .note-box {
+    margin-top: 16px; background: #f0f4f8;
+    border-left: 3px solid #3b82d4; border-radius: 0 6px 6px 0;
+    padding: 10px 14px; font-size: 12.5px; color: #57606a; line-height: 1.5;
+  }
+  .env-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; background: #e8f0fb; color: #1c3f6e; border: 1px solid #c3d5f5;
+  }
+
+  /* Methodology section */
+  .method-section {
+    margin-top: 28px; border-top: 2px solid #e5e7eb; padding-top: 20px;
+  }
+  .method-toggle-btn {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    background: none; border: none; padding: 0; font-family: inherit;
+    font-size: 13px; font-weight: 700; color: #1c3f6e; letter-spacing: 0.2px;
+  }
+  .method-toggle-btn .arrow {
+    display: inline-block; width: 16px; height: 16px; transition: transform .2s;
+    font-style: normal;
+  }
+  .method-toggle-btn.open .arrow { transform: rotate(90deg); }
+  .method-body { display: none; margin-top: 16px; }
+  .method-body.visible { display: block; }
+
+  .method-intro {
+    font-size: 13px; color: #57606a; line-height: 1.6; margin-bottom: 18px;
+    background: #f7f8fa; border-radius: 6px; padding: 12px 14px;
+  }
+
+  .method-steps { display: flex; flex-direction: column; gap: 14px; }
+  .method-step {
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    background: #1c3f6e; color: #fff;
+    font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-size: 13px; font-weight: 700; color: #1f2328; }
+  .step-formula {
+    font-family: "Courier New", monospace; font-size: 12px;
+    background: #f0f4f8; border: 1px solid #e5e7eb; border-radius: 4px;
+    padding: 4px 8px; margin: 4px 0; display: inline-block; color: #1c3f6e;
+  }
+  .step-why { font-size: 12px; color: #57606a; margin-top: 3px; line-height: 1.55; }
+
+  .method-footer {
+    margin-top: 16px; padding: 10px 14px;
+    background: #fff8e1; border-left: 3px solid #f59e0b;
+    border-radius: 0 6px 6px 0; font-size: 12px; color: #57606a; line-height: 1.5;
+  }
+
+  .divider { height: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Db2 Warehouse Enterprise — VPC Calculator</h1>
+    <p>Answer the sizing questions below to determine the required Virtual Processor Core (VPC) count.</p>
+  </div>
+
+  <!-- Main form card -->
+  <div class="card">
+
+    <!-- ── Hardware toggle ── -->
+    <div class="toggle-bar">
+      <span id="toggleLabelOff" class="active">Greenfield (no existing hardware)</span>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="hwToggle" onchange="toggleHardware()">
+        <span class="toggle-slider"></span>
+      </label>
+      <span id="toggleLabelOn">I have existing / planned hardware</span>
+    </div>
+
+    <!-- ── Hardware inputs (hidden until toggled) ── -->
+    <div class="hw-panel" id="hwPanel">
+      <div class="section-title">Hardware Specifications</div>
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label>CPU Family <span class="hint">(affects VPC ratio)</span></label>
+          <select id="cpuFamily">
+            <option value="xeon_scalable">Intel Xeon Scalable (1 core = 1 VPC)</option>
+            <option value="xeon_v4">Intel Xeon v4/v5 (1 core = 1 VPC)</option>
+            <option value="amd_epyc">AMD EPYC (1 core = 1 VPC)</option>
+            <option value="power10">IBM POWER10 (1 core = 4 VPC)</option>
+            <option value="power9">IBM POWER9 (1 core = 4 VPC)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Physical cores per server <span class="req">*</span></label>
+          <input type="number" id="coresPerServer" min="1" placeholder="e.g. 32">
+        </div>
+
+        <div class="form-group">
+          <label>Number of servers / nodes <span class="req">*</span></label>
+          <input type="number" id="numServers" min="1" placeholder="e.g. 2">
+        </div>
+
+        <div class="form-group">
+          <label>RAM per server <span class="hint">(GB)</span></label>
+          <input type="number" id="ramPerServer" min="1" placeholder="e.g. 256">
+        </div>
+
+        <div class="form-group">
+          <label>Usable storage per server <span class="hint">(TB)</span></label>
+          <input type="number" id="storagePerServer" min="0" step="0.1" placeholder="e.g. 10">
+        </div>
+
+        <div class="form-group">
+          <label>Storage type</label>
+          <select id="storageType">
+            <option value="nvme">NVMe SSD (fastest)</option>
+            <option value="sas_ssd">SAS / SATA SSD</option>
+            <option value="hdd">HDD (spinning disk)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Network bandwidth per node <span class="hint">(Gbps)</span></label>
+          <select id="netBandwidth">
+            <option value="100">100 Gbps</option>
+            <option value="25">25 Gbps</option>
+            <option value="10">10 Gbps</option>
+            <option value="1">1 Gbps</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>SMT / Hyperthreading</label>
+          <select id="smtMode">
+            <option value="off">Off (1 thread/core)</option>
+            <option value="smt2">SMT-2 / HT (2 threads/core)</option>
+            <option value="smt4">SMT-4 (4 threads/core)</option>
+            <option value="smt8">SMT-8 (8 threads/core)</option>
+          </select>
+        </div>
+
+      </div>
+    </div>
+    <!-- /hwPanel -->
+
+    <!-- ── Workload questions ── -->
+    <div class="section-title">Q1–Q4 · Workload &amp; Users</div>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>1. Expected database size <span class="req">*</span><span class="hint">(GB)</span></label>
+        <input type="number" id="dbSize" min="1" placeholder="e.g. 5000">
+      </div>
+
+      <div class="form-group">
+        <label>2. Concurrent users / applications <span class="req">*</span></label>
+        <input type="number" id="concUsers" min="1" placeholder="e.g. 50">
+      </div>
+
+      <div class="form-group full">
+        <label>3. Primary workload type <span class="req">*</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="workload" value="oltp"> Transactional (OLTP)</label>
+          <label><input type="radio" name="workload" value="olap"> Analytical (OLAP / DW)</label>
+          <label><input type="radio" name="workload" value="mixed" checked> Mixed (HTAP)</label>
+        </div>
+      </div>
+
+      <div class="form-group full">
+        <label>4. High Availability &amp; Disaster Recovery required? <span class="req">*</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="hadr" value="yes" checked> Yes</label>
+          <label><input type="radio" name="hadr" value="no"> No</label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">Q5–Q7 · Performance &amp; Features</div>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>5. Target query throughput <span class="hint">(queries/sec)</span></label>
+        <input type="number" id="qps" min="1" placeholder="e.g. 20">
+      </div>
+
+      <div class="form-group">
+        <label>6. Advanced AI / ML features needed?</label>
+        <div class="radio-group" style="margin-top:8px">
+          <label><input type="radio" name="aiml" value="yes"> Yes</label>
+          <label><input type="radio" name="aiml" value="no" checked> No</label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">Q10 · Data Growth</div>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label>7. Daily data ingest <span class="hint">(GB/day)</span></label>
+        <input type="number" id="dailyIngest" min="0" placeholder="e.g. 50">
+      </div>
+
+      <div class="form-group">
+        <label>8. Data retention period <span class="hint">(months)</span></label>
+        <input type="number" id="retention" min="1" placeholder="e.g. 24">
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">Q16 · Environments — Drill-Down Sizing</div>
+    <p style="font-size:12.5px;color:#57606a;margin-bottom:14px;">Check each environment you need. Expand it to enter its specific specs — or leave blank to use the default % of Production.</p>
+
+    <div class="env-accordion">
+
+      <!-- Production -->
+      <div class="env-block">
+        <div class="env-block-header" onclick="toggleEnv('prod')">
+          <input type="checkbox" class="env-chk" id="envProd" checked onclick="event.stopPropagation()">
+          <span class="env-label">Production</span>
+          <span class="env-badge-role">Primary / Live</span>
+          <span class="env-arrow" id="env-arrow-prod">▶</span>
+        </div>
+        <div class="env-block-body" id="env-body-prod">
+          <div class="env-note">Production is the baseline. All other environments are sized as a % of Production by default.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DB Size <span class="hint">(GB, overrides global)</span></label><input type="number" id="prod-db" min="1" placeholder="Uses global value"></div>
+            <div class="form-group"><label>Concurrent Users</label><input type="number" id="prod-users" min="1" placeholder="Uses global value"></div>
+            <div class="form-group"><label>Queries/sec</label><input type="number" id="prod-qps" min="1" placeholder="Uses global value"></div>
+            <div class="form-group"><label>Daily Ingest <span class="hint">(GB/day)</span></label><input type="number" id="prod-ingest" min="0" placeholder="Uses global value"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DR -->
+      <div class="env-block">
+        <div class="env-block-header" onclick="toggleEnv('dr')">
+          <input type="checkbox" class="env-chk" id="envDR" onclick="event.stopPropagation()">
+          <span class="env-label">DR / Standby</span>
+          <span class="env-badge-role">Default: 100% of Prod</span>
+          <span class="env-arrow" id="env-arrow-dr">▶</span>
+        </div>
+        <div class="env-block-body" id="env-body-dr">
+          <div class="env-note">DR must mirror Production exactly to be a valid failover target. By default it uses 100% of Production VPCs. You can reduce this if you use a warm/cold standby strategy.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DB Size <span class="hint">(GB)</span></label><input type="number" id="dr-db" min="1" placeholder="Same as Production"></div>
+            <div class="form-group"><label>Concurrent Users</label><input type="number" id="dr-users" min="1" placeholder="Same as Production"></div>
+            <div class="form-group"><label>Queries/sec</label><input type="number" id="dr-qps" min="1" placeholder="Same as Production"></div>
+            <div class="form-group"><label>Override VPC % of Prod <span class="hint">(1–100)</span></label><input type="number" id="dr-pct" min="1" max="100" placeholder="100"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UAT -->
+      <div class="env-block">
+        <div class="env-block-header" onclick="toggleEnv('uat')">
+          <input type="checkbox" class="env-chk" id="envUAT" onclick="event.stopPropagation()">
+          <span class="env-label">UAT</span>
+          <span class="env-badge-role">Default: 50% of Prod</span>
+          <span class="env-arrow" id="env-arrow-uat">▶</span>
+        </div>
+        <div class="env-block-body" id="env-body-uat">
+          <div class="env-note">UAT simulates realistic user load for acceptance testing. Typically needs 50% of Production resources to replicate performance-sensitive test scenarios.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DB Size <span class="hint">(GB)</span></label><input type="number" id="uat-db" min="1" placeholder="Subset of Production"></div>
+            <div class="form-group"><label>Concurrent Users</label><input type="number" id="uat-users" min="1" placeholder="e.g. half of prod"></div>
+            <div class="form-group"><label>Queries/sec</label><input type="number" id="uat-qps" min="1" placeholder="e.g. half of prod"></div>
+            <div class="form-group"><label>Override VPC % of Prod <span class="hint">(1–100)</span></label><input type="number" id="uat-pct" min="1" max="100" placeholder="50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test -->
+      <div class="env-block">
+        <div class="env-block-header" onclick="toggleEnv('test')">
+          <input type="checkbox" class="env-chk" id="envTest" onclick="event.stopPropagation()">
+          <span class="env-label">Test</span>
+          <span class="env-badge-role">Default: 30% of Prod</span>
+          <span class="env-arrow" id="env-arrow-test">▶</span>
+        </div>
+        <div class="env-block-body" id="env-body-test">
+          <div class="env-note">Test environments run functional and regression tests. They typically use a small data subset and low concurrency — 30% of Production is a standard IBM recommendation.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DB Size <span class="hint">(GB)</span></label><input type="number" id="test-db" min="1" placeholder="Small subset"></div>
+            <div class="form-group"><label>Concurrent Users</label><input type="number" id="test-users" min="1" placeholder="e.g. 5–10"></div>
+            <div class="form-group"><label>Queries/sec</label><input type="number" id="test-qps" min="1" placeholder="e.g. low"></div>
+            <div class="form-group"><label>Override VPC % of Prod <span class="hint">(1–100)</span></label><input type="number" id="test-pct" min="1" max="100" placeholder="30"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Development -->
+      <div class="env-block">
+        <div class="env-block-header" onclick="toggleEnv('dev')">
+          <input type="checkbox" class="env-chk" id="envDev" onclick="event.stopPropagation()">
+          <span class="env-label">Development</span>
+          <span class="env-badge-role">Default: 20% of Prod</span>
+          <span class="env-arrow" id="env-arrow-dev">▶</span>
+        </div>
+        <div class="env-block-body" id="env-body-dev">
+          <div class="env-note">Dev environments are used by individual developers and rarely run concurrent workloads. 20% of Production is a typical IBM minimum to keep the environment functional without over-licensing.</div>
+          <div class="form-grid">
+            <div class="form-group"><label>DB Size <span class="hint">(GB)</span></label><input type="number" id="dev-db" min="1" placeholder="Minimal dataset"></div>
+            <div class="form-group"><label>Concurrent Users</label><input type="number" id="dev-users" min="1" placeholder="e.g. 2–5"></div>
+            <div class="form-group"><label>Queries/sec</label><input type="number" id="dev-qps" min="1" placeholder="e.g. low"></div>
+            <div class="form-group"><label>Override VPC % of Prod <span class="hint">(1–100)</span></label><input type="number" id="dev-pct" min="1" max="100" placeholder="20"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /env-accordion -->
+
+    <div class="divider"></div>
+    <div class="section-title">Q13 · Deployment</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>10. Deployment target <span class="req">*</span></label>
+        <div class="radio-group">
+          <label><input type="radio" name="deploy" value="cloud" checked> Cloud (IBM Cloud / AWS / Azure)</label>
+          <label><input type="radio" name="deploy" value="onprem"> On-Premises</label>
+          <label><input type="radio" name="deploy" value="hybrid"> Hybrid</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">Q12 · Security &amp; Compliance</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>11. Security / compliance requirements</label>
+        <div class="checkbox-grid">
+          <label><input type="checkbox" id="secEncryption"> Encryption at rest &amp; transit</label>
+          <label><input type="checkbox" id="secAudit"> Auditing / logging</label>
+          <label><input type="checkbox" id="secMasking"> Data masking</label>
+          <label><input type="checkbox" id="secRBAC"> RBAC / row-level security</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-title">Q15 · Infrastructure Constraints</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>12. Virtualization / platform constraint</label>
+        <select id="infra">
+          <option value="none">None / Standard</option>
+          <option value="openshift">OpenShift (OCP)</option>
+          <option value="vmware">VMware</option>
+          <option value="baremetal">Bare Metal</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculate()">Calculate VPC Requirements</button>
+  </div><!-- /card -->
+
+  <!-- Result Panel -->
+  <div class="result-panel" id="resultPanel">
+    <div class="result-header" id="resultHeader">VPC Sizing Estimate</div>
+    <div class="result-body">
+
+      <!-- Summary boxes -->
+      <div class="summary-row">
+        <div class="summary-box" id="boxRequired">
+          <div class="big" id="vpcTotal">—</div>
+          <div class="lbl">VPCs Required</div>
+          <div class="sub">Recommended minimum across all environments</div>
+        </div>
+        <div class="summary-box" id="boxAvailable" style="display:none">
+          <div class="big" id="vpcAvailable">—</div>
+          <div class="lbl">VPCs Available</div>
+          <div class="sub" id="hwSummaryText">From your hardware</div>
+        </div>
+        <div class="summary-box" id="boxNodes" style="display:none">
+          <div class="big" id="nodesReq">—</div>
+          <div class="lbl">Nodes Needed</div>
+          <div class="sub" id="nodesSub">Based on your server spec</div>
+        </div>
+      </div>
+
+      <!-- Fit alert -->
+      <div id="fitAlert" style="display:none; margin-top:14px;"></div>
+
+      <!-- Per-environment breakdown -->
+      <div class="breakdown">
+        <div class="breakdown-title">VPC Breakdown — by Environment</div>
+        <div id="envBreakdownContainer"></div>
+      </div>
+
+      <!-- Grand total flat breakdown (collapsible) -->
+      <div class="breakdown" style="margin-top:0;border-top:none;padding-top:0;">
+        <div class="breakdown-title" style="margin-top:16px;">Production Build-up (step by step)</div>
+        <table class="breakdown-table" id="breakdownTable"></table>
+      </div>
+
+      <div class="note-box" id="noteBox"></div>
+
+      <!-- Methodology explanation -->
+      <div class="method-section">
+        <button class="method-toggle-btn" id="methodBtn" onclick="toggleMethod()">
+          <i class="arrow">▶</i> How is this VPC count calculated? (Methodology explained)
+        </button>
+        <div class="method-body" id="methodBody">
+
+          <div class="method-intro">
+            A VPC (Virtual Processor Core) is IBM's software licensing unit for Db2 Warehouse. It maps to a physical processor core — <strong>not</strong> a logical thread. The calculation below builds up the required VPC count step by step, starting from raw data volume and layering on workload, users, features, and environments. Every factor has a documented IBM sizing rationale.
+          </div>
+
+          <div class="method-steps">
+
+            <div class="method-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <div class="step-title">Base VPC from Data Volume</div>
+                <div class="step-formula">Base VPC = max(4, ceil(Database Size GB ÷ 500))</div>
+                <div class="step-why">IBM Db2 Warehouse applies roughly 2:1 data compression for warehouse workloads. Every ~500 GB of raw data needs approximately 1 VPC of compute to handle scans, joins, and aggregation efficiently. The hard floor of 4 VPCs is the IBM-documented minimum for any Db2 Warehouse deployment.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <div class="step-title">Concurrent User Scaling</div>
+                <div class="step-formula">User VPC = ceil(Concurrent Users ÷ 10)</div>
+                <div class="step-why">Db2 Warehouse's query scheduler assigns CPU slots per active query. At steady state, roughly 10 concurrent users share 1 VPC without significant queuing. Beyond this ratio, query wait times increase noticeably. This adds VPCs on top of the storage-based base.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <div class="step-title">Query Throughput (QPS)</div>
+                <div class="step-formula">QPS VPC = ceil(Queries/sec ÷ (5 × Storage Factor))</div>
+                <div class="step-why">A single VPC can sustain roughly 5 queries/second on NVMe storage. This drops to ~3.75 q/s on SATA SSD (×0.75) and ~2.25 q/s on spinning HDD (×0.45), because I/O bottlenecks become the constraint. If you entered hardware specs, the storage type you selected adjusts this baseline automatically.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <div class="step-title">Data Growth &amp; Ingest VPC</div>
+                <div class="step-formula">Growth VPC = ceil((Daily Ingest GB × 30 × Retention Months) ÷ 2000)</div>
+                <div class="step-why">ETL/ELT pipelines and continuous data loading consume CPU separately from query workloads. Every 2,000 GB of projected total data growth requires roughly 1 additional VPC to keep ingest pipelines from competing with query resources. This projects storage growth over the full retention window you entered.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">5</div>
+              <div class="step-body">
+                <div class="step-title">Workload Type Multiplier</div>
+                <div class="step-formula">After Workload = ceil(Subtotal × Multiplier)</div>
+                <div class="step-why">
+                  Different workloads have fundamentally different CPU profiles:<br>
+                  • <strong>OLTP (×1.0)</strong> — short, indexed row lookups; low CPU per query.<br>
+                  • <strong>Mixed HTAP (×1.3)</strong> — mix of transactions and analytics; both CPU and I/O compete.<br>
+                  • <strong>OLAP/DW (×1.5)</strong> — full scans, large aggregations, complex joins; highest CPU demand per VPC.<br>
+                  This multiplier is applied to the combined subtotal from steps 1–4.
+                </div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">6</div>
+              <div class="step-body">
+                <div class="step-title">High Availability &amp; DR Overhead</div>
+                <div class="step-formula">HA/DR Add = ceil(After Workload × 0.20)</div>
+                <div class="step-why">IBM Db2 HADR (High Availability Disaster Recovery) runs a continuous log shipping and synchronization process on the primary node. This background workload consumes ~20% of the primary CPU budget on average and must be factored in to avoid degraded query performance during HA activity.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">7</div>
+              <div class="step-body">
+                <div class="step-title">AI / ML Feature Overhead</div>
+                <div class="step-formula">AI/ML Add = ceil(After Workload × 0.15)</div>
+                <div class="step-why">Db2 Warehouse's in-database AI features — vector search, automated statistics, ML model scoring — run inside the engine. When enabled, they add a background CPU footprint of approximately 15% over standard query processing, as they must co-exist with live query workloads.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">8</div>
+              <div class="step-body">
+                <div class="step-title">Security Feature Overhead</div>
+                <div class="step-formula">Security Add = ceil(After Workload × 0.05 × Active Features)</div>
+                <div class="step-why">Each active security feature (encryption, auditing, data masking, RBAC) adds ~5% CPU overhead. Encryption affects every I/O path; auditing writes to event streams; masking applies CPU-intensive transformations at read time; RBAC evaluates policy on every query. The overheads are additive (only applied when 2+ features are selected).</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">9</div>
+              <div class="step-body">
+                <div class="step-title">Platform / Virtualisation Overhead</div>
+                <div class="step-formula">OpenShift: +10% &nbsp;|&nbsp; VMware: +8%</div>
+                <div class="step-why">Container and hypervisor layers introduce scheduling latency and memory overhead. OpenShift (OCP) adds ~10% due to pod scheduling, cgroups limits, and overlay networking. VMware adds ~8% from the hypervisor scheduler and memory balloon driver. Bare metal has no overhead. These are applied to the post-workload total.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">10</div>
+              <div class="step-body">
+                <div class="step-title">Non-Production Environment Scaling</div>
+                <div class="step-formula">DR = 100% &nbsp;|&nbsp; UAT = 50% &nbsp;|&nbsp; Test = 30% &nbsp;|&nbsp; Dev = 20% of Production</div>
+                <div class="step-why">Non-production environments need their own licensed VPCs. DR/Standby must mirror production exactly (100%) for a true failover target. UAT needs enough to simulate realistic load (50%). Test and Dev environments handle reduced concurrency and smaller data subsets, so 30% and 20% of production sizing are accepted IBM best-practice minimums.</div>
+              </div>
+            </div>
+
+            <div class="method-step">
+              <div class="step-num">11</div>
+              <div class="step-body">
+                <div class="step-title">4-VPC Tier Alignment</div>
+                <div class="step-formula">Final VPC = ceil(Total ÷ 4) × 4</div>
+                <div class="step-why">IBM Db2 Warehouse is licensed and provisioned in increments of 4 VPCs (one standard node tier on IBM Cloud / Cloud Pak for Data). The total is rounded up to the nearest multiple of 4 to ensure you are purchasing a valid license tier — fractional tiers do not exist.</div>
+              </div>
+            </div>
+
+          </div><!-- /method-steps -->
+
+          <div class="method-footer">
+            <strong>Disclaimer:</strong> These formulas are derived from IBM Db2 Warehouse sizing guidelines, IBM Cloud Pak for Data documentation, and established field sizing practices. They are estimates intended for pre-sales planning and initial scoping. Final production sizing must be validated by an IBM technical architect using IBM's official Sizing Tool or a Proof of Concept engagement.
+          </div>
+
+        </div><!-- /method-body -->
+      </div><!-- /method-section -->
+
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// VPC multiplier per physical core by CPU family
+const CPU_VPC_RATIO = {
+  xeon_scalable: 1,
+  xeon_v4:       1,
+  amd_epyc:      1,
+  power10:       4,
+  power9:        4
+};
+
+// Storage I/O efficiency factor (affects q/s per VPC baseline)
+const STORAGE_QPS_FACTOR = { nvme: 1.0, sas_ssd: 0.75, hdd: 0.45 };
+
+function toggleHardware() {
+  const on = document.getElementById('hwToggle').checked;
+  document.getElementById('hwPanel').classList.toggle('visible', on);
+  document.getElementById('toggleLabelOff').classList.toggle('active', !on);
+  document.getElementById('toggleLabelOn').classList.toggle('active', on);
+}
+
+// ── Helper: compute VPC for one environment's specs ──
+function computeEnvVpc(db, users, qps, ingest, retention, workload, storFactor) {
+  const base    = Math.max(4, Math.ceil(db / 500));
+  const userV   = Math.ceil(users / 10);
+  const qpsV    = qps > 0 ? Math.ceil(qps / (5 * storFactor)) : 0;
+  const growthV = (ingest > 0 && retention > 0) ? Math.ceil((ingest * 30 * retention) / 2000) : 0;
+  const sub     = base + userV + qpsV + growthV;
+  const mult    = workload === 'olap' ? 1.5 : workload === 'mixed' ? 1.3 : 1.0;
+  return { base, userV, qpsV, growthV, sub, mult, after: Math.ceil(sub * mult) };
+}
+
+// ── Helper: build a detail row for the per-env table ──
+function envRow(label, why, value, indent) {
+  const pad = indent ? 'padding-left:20px;' : '';
+  return `<tr><td style="${pad}">
+    <span class="step-pill">${label}</span>
+    <span class="why-text">${why}</span>
+  </td><td>${value}</td></tr>`;
+}
+
+function calculate() {
+  const hasHW = document.getElementById('hwToggle').checked;
+
+  // ── Global workload inputs ──
+  const gDb      = parseFloat(document.getElementById('dbSize').value)      || 0;
+  const gUsers   = parseFloat(document.getElementById('concUsers').value)   || 0;
+  const gQps     = parseFloat(document.getElementById('qps').value)         || 0;
+  const gIngest  = parseFloat(document.getElementById('dailyIngest').value) || 0;
+  const gRetMo   = parseFloat(document.getElementById('retention').value)   || 12;
+
+  const workload = document.querySelector('input[name="workload"]:checked').value;
+  const hadr     = document.querySelector('input[name="hadr"]:checked').value;
+  const aiml     = document.querySelector('input[name="aiml"]:checked').value;
+  const deploy   = document.querySelector('input[name="deploy"]:checked').value;
+  const infra    = document.getElementById('infra').value;
+
+  const secEncryption = document.getElementById('secEncryption').checked;
+  const secAudit      = document.getElementById('secAudit').checked;
+  const secMasking    = document.getElementById('secMasking').checked;
+  const secRBAC       = document.getElementById('secRBAC').checked;
+
+  // ── Hardware inputs ──
+  const cpuFamily       = document.getElementById('cpuFamily').value;
+  const coresPerServer  = parseFloat(document.getElementById('coresPerServer').value) || 0;
+  const numServers      = parseFloat(document.getElementById('numServers').value)     || 0;
+  const ramPerServer    = parseFloat(document.getElementById('ramPerServer').value)   || 0;
+  const storagePerSrvTB = parseFloat(document.getElementById('storagePerServer').value) || 0;
+  const storageType     = document.getElementById('storageType').value;
+  const netBw           = parseFloat(document.getElementById('netBandwidth').value)  || 10;
+  const smtMode         = document.getElementById('smtMode').value;
+
+  const vpcPerCore   = CPU_VPC_RATIO[cpuFamily] || 1;
+  const vpcPerServer = coresPerServer * vpcPerCore;
+  const totalHWVpc   = vpcPerServer * numServers;
+  const totalHWRam   = ramPerServer * numServers;
+  const totalStorTB  = storagePerSrvTB * numServers;
+  const storFactor   = STORAGE_QPS_FACTOR[storageType] || 1.0;
+
+  const secCount = [secEncryption, secAudit, secMasking, secRBAC].filter(Boolean).length;
+
+  // ── Per-environment specs (fall back to global if blank) ──
+  function envVal(id, fallback) { const v = parseFloat(document.getElementById(id).value); return v > 0 ? v : fallback; }
+  function envPct(id, def)      { const v = parseFloat(document.getElementById(id).value); return (v > 0 && v <= 100) ? v / 100 : def; }
+
+  // ── Compute Production ──
+  const prodDb     = envVal('prod-db',     gDb);
+  const prodUsers  = envVal('prod-users',  gUsers);
+  const prodQps    = envVal('prod-qps',    gQps);
+  const prodIngest = envVal('prod-ingest', gIngest);
+
+  const p = computeEnvVpc(prodDb, prodUsers, prodQps, prodIngest, gRetMo, workload, storFactor);
+
+  // Apply HA/DR, AI/ML, security, infra overhead to production
+  const hadrAdd  = hadr === 'yes'   ? Math.ceil(p.after * 0.20) : 0;
+  const aimlAdd  = aiml === 'yes'   ? Math.ceil(p.after * 0.15) : 0;
+  const secAdd   = secCount >= 2    ? Math.ceil(p.after * 0.05 * secCount) : 0;
+  const infraAdd = infra === 'openshift' ? Math.ceil(p.after * 0.10)
+                 : infra === 'vmware'    ? Math.ceil(p.after * 0.08) : 0;
+
+  const prodVpc = Math.max(4, p.after + hadrAdd + aimlAdd + secAdd + infraAdd);
+
+  // ── Compute each non-prod environment ──
+  const envEnabled = {
+    prod: document.getElementById('envProd').checked,
+    dr:   document.getElementById('envDR').checked,
+    uat:  document.getElementById('envUAT').checked,
+    test: document.getElementById('envTest').checked,
+    dev:  document.getElementById('envDev').checked,
+  };
+
+  // For non-prod: if user entered specific specs, compute independently;
+  // otherwise apply the % override (or default %) of prodVpc.
+  function calcNonProd(key, defaultPct) {
+    const db    = parseFloat(document.getElementById(key + '-db').value)    || 0;
+    const users = parseFloat(document.getElementById(key + '-users').value) || 0;
+    const qps_  = parseFloat(document.getElementById(key + '-qps').value)   || 0;
+    const pct   = envPct(key + '-pct', defaultPct);
+    const hasCustom = db > 0 || users > 0 || qps_ > 0;
+    if (hasCustom) {
+      const c = computeEnvVpc(
+        db    || prodDb,
+        users || prodUsers,
+        qps_  || prodQps,
+        0, gRetMo, workload, storFactor
+      );
+      return { vpc: Math.max(4, c.after), custom: true, detail: c, pct: null };
+    }
+    const vpc = Math.max(4, Math.ceil(prodVpc * pct));
+    return { vpc, custom: false, detail: null, pct };
+  }
+
+  const envResults = {
+    prod: { vpc: prodVpc, custom: true,  detail: p },
+    dr:   calcNonProd('dr',   1.00),
+    uat:  calcNonProd('uat',  0.50),
+    test: calcNonProd('test', 0.30),
+    dev:  calcNonProd('dev',  0.20),
+  };
+
+  // ── Grand total ──
+  let totalVpc = 0;
+  if (envEnabled.prod) totalVpc += envResults.prod.vpc;
+  if (envEnabled.dr)   totalVpc += envResults.dr.vpc;
+  if (envEnabled.uat)  totalVpc += envResults.uat.vpc;
+  if (envEnabled.test) totalVpc += envResults.test.vpc;
+  if (envEnabled.dev)  totalVpc += envResults.dev.vpc;
+
+  const alignedVpc = Math.ceil(totalVpc / 4) * 4;
+  const finalVpc   = alignedVpc;
+
+  // ── Hardware fit ──
+  let fitClass = '', fitMsg = '', nodesNeeded = 0;
+  if (hasHW && coresPerServer > 0 && numServers > 0) {
+    const ramPerVpc = totalHWRam / totalHWVpc;
+    const ramOk = ramPerVpc >= 8;
+    const compRatio = workload === 'oltp' ? 1.5 : 3.0;
+    const effStorTB = totalStorTB * compRatio;
+    const storageOk = effStorTB >= (gDb / 1024);
+    const netOk = netBw >= 10;
+    nodesNeeded = Math.ceil(finalVpc / vpcPerServer);
+    const surplus = totalHWVpc - finalVpc;
+    const issues = [!ramOk && 'Low RAM', !storageOk && 'Insufficient storage', !netOk && 'Low network bandwidth'].filter(Boolean);
+    if (surplus >= 0 && issues.length === 0)      { fitClass = 'fit-ok';    fitMsg = '✓ Hardware fully supports this workload with ' + surplus + ' VPCs to spare.'; }
+    else if (surplus >= 0 && issues.length > 0)   { fitClass = 'fit-warn';  fitMsg = '⚠ VPC count is sufficient but review: ' + issues.join(', ') + '.'; }
+    else                                           { fitClass = 'fit-error'; fitMsg = '✗ Hardware shortfall: need ' + finalVpc + ' VPCs, have ' + totalHWVpc + '. Add ' + nodesNeeded + ' node(s) minimum.'; }
+  }
+
+  // ── RENDER ──
+  document.getElementById('vpcTotal').textContent = finalVpc;
+  document.getElementById('resultHeader').textContent = hasHW
+    ? 'VPC Sizing Estimate + Hardware Fit Analysis' : 'VPC Sizing Estimate';
+
+  // Hardware boxes
+  const boxAvail = document.getElementById('boxAvailable');
+  const boxNodes = document.getElementById('boxNodes');
+  if (hasHW && coresPerServer > 0 && numServers > 0) {
+    document.getElementById('vpcAvailable').textContent = totalHWVpc;
+    document.getElementById('hwSummaryText').textContent = numServers + ' × ' + coresPerServer + '-core ' + cpuFamily.replace('_',' ') + ' server(s)';
+    boxAvail.style.display = ''; boxAvail.className = 'summary-box ' + fitClass;
+    document.getElementById('nodesReq').textContent = nodesNeeded;
+    document.getElementById('nodesSub').textContent = 'Nodes of ' + vpcPerServer + ' VPC each to meet requirement';
+    boxNodes.style.display = '';
+  } else { boxAvail.style.display = 'none'; boxNodes.style.display = 'none'; }
+
+  // Fit alert
+  const fitAlert = document.getElementById('fitAlert');
+  if (fitMsg) {
+    const cMap = { 'fit-ok':'#d1fae5','fit-warn':'#fef3c7','fit-error':'#fee2e2' };
+    const bMap = { 'fit-ok':'#059669','fit-warn':'#d97706','fit-error':'#dc2626' };
+    fitAlert.style.cssText = `display:block;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:600;background:${cMap[fitClass]};border-left:4px solid ${bMap[fitClass]};color:#1f2328`;
+    fitAlert.textContent = fitMsg;
+  } else { fitAlert.style.display = 'none'; }
+
+  // ── Per-environment breakdown table ──
+  const ENV_META = [
+    { key:'prod', label:'Production',   role:'Primary / Live',    color:'#1c3f6e' },
+    { key:'dr',   label:'DR / Standby', role:'Failover',          color:'#7c3aed' },
+    { key:'uat',  label:'UAT',          role:'Acceptance Testing', color:'#0891b2' },
+    { key:'test', label:'Test',         role:'Functional Testing', color:'#065f46' },
+    { key:'dev',  label:'Development',  role:'Developer Sandbox',  color:'#92400e' },
+  ];
+
+  const wfLabel = workload === 'olap' ? 'OLAP ×1.5' : workload === 'mixed' ? 'Mixed HTAP ×1.3' : 'OLTP ×1.0';
+  const storLabel = hasHW ? storageType : 'NVMe (default)';
+
+  let envTableHtml = `<table class="env-result-table">
+    <thead><tr>
+      <th>Factor</th>
+      <th style="text-align:right">VPCs</th>
+    </tr></thead><tbody>`;
+
+  // Totals-by-env summary rows first
+  let envSummaryRows = `<table class="env-result-table" style="margin-bottom:16px;">
+    <thead><tr><th>Environment</th><th>Role</th><th>Calculation Basis</th><th style="text-align:right">VPC Count</th></tr></thead><tbody>`;
+
+  ENV_META.forEach(em => {
+    if (!envEnabled[em.key]) return;
+    const r = envResults[em.key];
+    let basis = '';
+    if (em.key === 'prod') {
+      basis = `DB ${prodDb.toLocaleString()} GB · ${prodUsers} users · workload ${wfLabel}`;
+    } else if (r.custom) {
+      const db_   = parseFloat(document.getElementById(em.key+'-db').value)    || prodDb;
+      const usr_  = parseFloat(document.getElementById(em.key+'-users').value) || prodUsers;
+      const qps__ = parseFloat(document.getElementById(em.key+'-qps').value)   || prodQps;
+      basis = `Custom specs: ${db_.toLocaleString()} GB · ${usr_} users · ${qps__} q/s`;
+    } else {
+      basis = `${Math.round(r.pct * 100)}% of Production (${prodVpc} VPC) = ${r.vpc} VPC`;
+    }
+    envSummaryRows += `<tr>
+      <td><strong style="color:${em.color}">${em.label}</strong></td>
+      <td style="color:#57606a;font-size:12px">${em.role}</td>
+      <td style="color:#57606a;font-size:12px">${basis}</td>
+      <td><strong style="color:${em.color}">${r.vpc}</strong></td>
+    </tr>`;
+  });
+
+  const roundNote = alignedVpc !== totalVpc
+    ? `<tr class="env-total"><td colspan="3">Rounded to nearest 4-VPC licensing tier (${totalVpc} → ${alignedVpc})</td><td>${alignedVpc}</td></tr>`
+    : `<tr class="env-total"><td colspan="3">Grand Total (aligned to 4-VPC tier)</td><td>${finalVpc}</td></tr>`;
+  envSummaryRows += roundNote + '</tbody></table>';
+
+  // Production detailed step-by-step drill-down
+  const prodSteps = `<div style="margin-top:4px">
+    <div style="font-size:12px;font-weight:700;color:#1c3f6e;margin-bottom:8px">Production — Step-by-step VPC build-up</div>
+    <table class="env-result-table">
+    <thead><tr><th>Step</th><th style="text-align:right">VPCs</th></tr></thead>
+    <tbody>
+      ${envRow('1 · Data Volume', `max(4, ceil(${prodDb.toLocaleString()} GB ÷ 500)) = ${p.base} VPC — 1 VPC per 500 GB of raw data (2:1 DW compression assumed)`, p.base)}
+      ${envRow('2 · Users', `ceil(${prodUsers} users ÷ 10) = ${p.userV} VPC — 10 concurrent users share 1 VPC query slot`, '+'+p.userV)}
+      ${p.qpsV > 0 ? envRow('3 · Throughput', `ceil(${prodQps} q/s ÷ (5 × ${storFactor} ${storLabel})) = ${p.qpsV} VPC`, '+'+p.qpsV) : ''}
+      ${p.growthV > 0 ? envRow('4 · Data Growth', `ceil((${prodIngest} GB/day × 30 × ${gRetMo} mo) ÷ 2000) = ${p.growthV} VPC`, '+'+p.growthV) : ''}
+      ${envRow('5 · Workload ×', `Subtotal ${p.sub} × ${wfLabel} = ${p.after} VPC`, '→ '+p.after)}
+      ${hadrAdd  > 0 ? envRow('6 · HA/DR',      `ceil(${p.after} × 20%) = ${hadrAdd} VPC — log shipping CPU overhead`, '+'+hadrAdd) : ''}
+      ${aimlAdd  > 0 ? envRow('7 · AI/ML',       `ceil(${p.after} × 15%) = ${aimlAdd} VPC — in-DB ML scoring overhead`, '+'+aimlAdd) : ''}
+      ${secAdd   > 0 ? envRow('8 · Security',    `ceil(${p.after} × 5% × ${secCount} features) = ${secAdd} VPC`, '+'+secAdd) : ''}
+      ${infraAdd > 0 ? envRow('9 · Platform',    `${infra === 'openshift' ? 'OpenShift +10%' : 'VMware +8%'} = ${infraAdd} VPC`, '+'+infraAdd) : ''}
+      <tr class="env-total"><td><strong>Production Total</strong> <span style="font-weight:400;color:#57606a">(minimum 4 VPC)</span></td><td>${prodVpc}</td></tr>
+    </tbody></table>
+  </div>`;
+
+  // Non-prod drill-downs
+  let nonProdDetails = '';
+  ENV_META.slice(1).forEach(em => {
+    if (!envEnabled[em.key]) return;
+    const r = envResults[em.key];
+    if (r.custom && r.detail) {
+      const d = r.detail;
+      const db_   = parseFloat(document.getElementById(em.key+'-db').value)    || prodDb;
+      const usr_  = parseFloat(document.getElementById(em.key+'-users').value) || prodUsers;
+      const qps__ = parseFloat(document.getElementById(em.key+'-qps').value)   || prodQps;
+      nonProdDetails += `<div style="margin-top:12px">
+        <div style="font-size:12px;font-weight:700;color:${em.color};margin-bottom:6px">${em.label} — Custom Spec Build-up</div>
+        <table class="env-result-table"><thead><tr><th>Step</th><th style="text-align:right">VPCs</th></tr></thead><tbody>
+          ${envRow('1 · Data Volume', `max(4, ceil(${db_.toLocaleString()} GB ÷ 500)) = ${d.base} VPC`, d.base)}
+          ${envRow('2 · Users', `ceil(${usr_} users ÷ 10) = ${d.userV} VPC`, '+'+d.userV)}
+          ${d.qpsV > 0 ? envRow('3 · Throughput', `ceil(${qps__} q/s ÷ (5 × ${storFactor})) = ${d.qpsV} VPC`, '+'+d.qpsV) : ''}
+          ${envRow('4 · Workload ×', `${d.sub} × ${wfLabel} = ${d.after} VPC`, '→ '+d.after)}
+          <tr class="env-total"><td><strong>${em.label} Total</strong></td><td>${r.vpc}</td></tr>
+        </tbody></table>
+      </div>`;
+    } else {
+      nonProdDetails += `<div style="margin-top:12px;padding:10px 14px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:6px;font-size:12.5px;color:#57606a">
+        <strong style="color:${em.color}">${em.label}</strong> — using default ${Math.round(r.pct*100)}% of Production:
+        ${Math.round(r.pct*100)}% × ${prodVpc} VPC = <strong>${r.vpc} VPC</strong>.
+        <span style="display:block;margin-top:4px">To get a custom breakdown, expand the ${em.label} panel above and enter specific DB size, users, and QPS.</span>
+      </div>`;
+    }
+  });
+
+  document.getElementById('envBreakdownContainer').innerHTML =
+    envSummaryRows + prodSteps + nonProdDetails;
+
+  // Production flat breakdown (legacy table, still useful)
+  const prodRows = [
+    [`Base VPC (${prodDb.toLocaleString()} GB data)`, p.base],
+    [`+ Concurrent users (${prodUsers})`, '+' + p.userV],
+  ];
+  if (p.qpsV > 0) prodRows.push([`+ Throughput (${prodQps} q/s)`, '+' + p.qpsV]);
+  if (p.growthV > 0) prodRows.push([`+ Data growth`, '+' + p.growthV]);
+  prodRows.push([`× Workload (${wfLabel})`, '→ ' + p.after]);
+  if (hadrAdd  > 0) prodRows.push(['+ HA/DR overhead (20%)',      '+' + hadrAdd]);
+  if (aimlAdd  > 0) prodRows.push(['+ AI/ML overhead (15%)',      '+' + aimlAdd]);
+  if (secAdd   > 0) prodRows.push([`+ Security (${secCount}×5%)`, '+' + secAdd]);
+  if (infraAdd > 0) prodRows.push(['+ Platform overhead',         '+' + infraAdd]);
+  prodRows.push(['= Production VPC', prodVpc + ' VPC']);
+  if (alignedVpc !== totalVpc) prodRows.push(['Rounded to 4-VPC tier', finalVpc + ' VPC']);
+
+  document.getElementById('breakdownTable').innerHTML =
+    prodRows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+
+  // Deployment note
+  const deployNote = {
+    cloud:   'Cloud deployment — VPC aligns to IBM Cloud Pak for Data or SaaS tier increments of 4.',
+    onprem:  'On-premises deployment — VPC maps directly to physical or licensed cores (use sub-capacity licensing if eligible).',
+    hybrid:  'Hybrid deployment — confirm VPC split between cloud and on-prem with IBM licensing team.'
+  };
+  document.getElementById('noteBox').innerHTML =
+    `<strong>Note:</strong> ${deployNote[deploy]} Db2 Warehouse licensing is charged per VPC (4 VPCs = 1 standard node tier). These estimates follow IBM Db2 Warehouse sizing guidelines and should be validated with an IBM technical architect.`;
+
+  document.getElementById('resultPanel').classList.add('visible');
+  document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleEnv(key) {
+  const body  = document.getElementById('env-body-' + key);
+  const arrow = document.getElementById('env-arrow-' + key);
+  const hdr   = arrow.closest('.env-block-header');
+  const open  = body.classList.toggle('visible');
+  arrow.style.transform = open ? 'rotate(90deg)' : '';
+  hdr.classList.toggle('open', open);
+}
+
+function toggleMethod() {
+  const btn  = document.getElementById('methodBtn');
+  const body = document.getElementById('methodBody');
+  const isOpen = body.classList.toggle('visible');
+  btn.classList.toggle('open', isOpen);
+}
+</script>
+
+</body>
+</html>
